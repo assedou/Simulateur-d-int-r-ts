@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulateur — Intérêts Composés & DCA</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --surface2: #1e2330;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f2f7;
+    --text-muted: #7a8399;
+    --text-dim: #4a5168;
+    --accent: #4fffb0;
+    --accent2: #7b6cff;
+    --accent3: #ff9f4a;
+    --accent-glow: rgba(79,255,176,0.15);
+    --red: #ff5b6e;
+    --card-radius: 16px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(79,255,176,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,255,176,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* ── HEADER ── */
+  .header { margin-bottom: 48px; }
+  .header-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase;
+    background: var(--accent-glow); border: 1px solid rgba(79,255,176,0.2);
+    padding: 6px 14px; border-radius: 100px; margin-bottom: 20px;
+  }
+  .header-tag::before { content: '◆'; font-size: 8px; }
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(36px, 5vw, 58px);
+    line-height: 1.1; color: var(--text);
+    margin-bottom: 12px;
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+  .header-sub { font-size: 16px; color: var(--text-muted); font-weight: 300; max-width: 500px; line-height: 1.6; }
+
+  /* ── LAYOUT ── */
+  .main-grid { display: grid; grid-template-columns: 380px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 860px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(79,255,176,0.3), transparent);
+  }
+  .card-title {
+    font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+    color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase;
+    margin-bottom: 24px; display: flex; align-items: center; gap: 8px;
+  }
+  .card-title::before { content: ''; display: block; width: 18px; height: 1px; background: var(--accent); }
+
+  /* ── PARAM SECTIONS ── */
+  .section-label {
+    font-size: 10px; font-family: 'DM Mono', monospace; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-dim);
+    margin: 24px 0 14px; padding-left: 10px;
+    border-left: 2px solid var(--accent2);
+  }
+  .section-label.dca-label { border-left-color: var(--accent3); }
+
+  /* ── SLIDERS ── */
+  .param { margin-bottom: 20px; }
+  .param-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .param-name { font-size: 13px; color: var(--text-muted); font-weight: 400; }
+  .param-value {
+    font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500;
+    color: var(--text); background: var(--surface2);
+    border: 1px solid var(--border2); border-radius: 8px;
+    padding: 3px 10px; min-width: 80px; text-align: right;
+    transition: color 0.2s;
+  }
+  .param-value.accent { color: var(--accent); border-color: rgba(79,255,176,0.25); }
+  .param-value.accent2 { color: var(--accent2); border-color: rgba(123,108,255,0.25); }
+  .param-value.accent3 { color: var(--accent3); border-color: rgba(255,159,74,0.25); }
+
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    background: var(--surface2); border-radius: 2px; outline: none;
+    cursor: pointer;
+  }
+  input[type=range].green::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--pct, 0%), var(--surface2) var(--pct, 0%)); }
+  input[type=range].purple::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent2) var(--pct, 0%), var(--surface2) var(--pct, 0%)); }
+  input[type=range].orange::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent3) var(--pct, 0%), var(--surface2) var(--pct, 0%)); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--text);
+    border: 2px solid var(--bg); cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(79,255,176,0.15);
+    transition: box-shadow 0.2s;
+  }
+  input[type=range].purple::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(123,108,255,0.2); }
+  input[type=range].orange::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(255,159,74,0.2); }
+  input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 5px rgba(79,255,176,0.2); }
+  .param-range { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); font-family: 'DM Mono', monospace; margin-top: 4px; }
+
+  /* ── RÉSULTATS CARDS ── */
+  .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+  .result-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px;
+    transition: border-color 0.3s;
+  }
+  .result-card.main {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, rgba(79,255,176,0.06), rgba(79,255,176,0.02));
+    border-color: rgba(79,255,176,0.2);
+  }
+  .result-label { font-size: 11px; color: var(--text-dim); font-family: 'DM Mono', monospace; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .result-amount {
+    font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 500;
+    color: var(--accent); line-height: 1;
+  }
+  .result-card:not(.main) .result-amount { font-size: 20px; color: var(--text); }
+  .result-card.gains .result-amount { color: var(--accent); }
+  .result-card.versé .result-amount { color: var(--accent2); }
+  .result-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+  /* ── BARRE DE RÉPARTITION ── */
+  .repartition-wrap { margin-bottom: 24px; }
+  .repartition-label { font-size: 11px; color: var(--text-dim); font-family: 'DM Mono', monospace; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .repartition-bar { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; display: flex; }
+  .rep-versé { background: var(--accent2); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+  .rep-gains { background: var(--accent); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+  /* ── CHART ── */
+  .chart-wrap { position: relative; height: 260px; margin-top: 8px; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--surface2); border-radius: 10px; padding: 4px; }
+  .tab {
+    flex: 1; padding: 8px 4px; border: none; background: transparent;
+    color: var(--text-muted); font-family: 'Outfit', sans-serif; font-size: 13px;
+    border-radius: 7px; cursor: pointer; transition: all 0.2s;
+  }
+  .tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+
+  /* ── TABLE ── */
+  .table-scroll { overflow-x: auto; max-height: 320px; overflow-y: auto; border-radius: 10px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th {
+    position: sticky; top: 0; background: var(--surface2);
+    font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
+    color: var(--text-dim); text-transform: uppercase; font-weight: 500;
+    padding: 10px 14px; text-align: right; white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th:first-child { text-align: left; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 9px 14px; text-align: right; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); }
+  tbody td:first-child { text-align: left; color: var(--text-dim); }
+  tbody td.highlight { color: var(--accent); font-weight: 500; }
+  tbody td.versé-col { color: var(--accent2); }
+  tbody td.gains-col { color: var(--accent); }
+  .row-milestone { background: rgba(79,255,176,0.04) !important; }
+
+  /* ── DCA BADGE ── */
+  .dca-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,159,74,0.1); border: 1px solid rgba(255,159,74,0.25);
+    color: var(--accent3); font-size: 11px; font-family: 'DM Mono', monospace;
+    padding: 4px 10px; border-radius: 6px; margin-top: 12px;
+  }
+  .dca-badge.hidden { opacity: 0; }
+
+  /* ── MILESTONES ── */
+  .milestones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .milestone {
+    font-size: 11px; font-family: 'DM Mono', monospace;
+    background: rgba(79,255,176,0.06); border: 1px solid rgba(79,255,176,0.15);
+    color: var(--accent); padding: 4px 10px; border-radius: 6px;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .card { animation: fadeUp 0.4s ease both; }
+  .card:nth-child(2) { animation-delay: 0.1s; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+      <div>
+        <div class="header-tag">Simulateur financier</div>
+        <h1>Intérêts composés<br>& <em>DCA progressif</em></h1>
+        <p class="header-sub">Visualisez l'effet de la capitalisation dans le temps. Ajustez chaque variable en temps réel.</p>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; padding-top:8px;">
+        <div style="width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg,rgba(79,255,176,0.25),rgba(123,108,255,0.25)); border:1.5px solid rgba(79,255,176,0.35); display:flex; align-items:center; justify-content:center; font-family:'DM Mono',monospace; font-size:14px; font-weight:500; color:var(--accent); letter-spacing:0.05em;">MA</div>
+        <div style="font-family:'DM Serif Display',serif; font-size:15px; color:var(--text); white-space:nowrap;">Michael <span style="font-weight:600; letter-spacing:0.06em; color:var(--accent);">ASSEDOU</span></div>
+        <div style="font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:0.1em; text-transform:uppercase;">Investisseur</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- ── PANNEAU PARAMÈTRES ── -->
+    <div class="card" style="animation-delay:0s">
+      <div class="card-title">Paramètres</div>
+
+      <div class="section-label">Base</div>
+
+      <div class="param">
+        <div class="param-header">
+          <span class="param-name">Versement mensuel initial</span>
+          <span class="param-value accent" id="val-versement">300 €</span>
+        </div>
+        <input type="range" id="versement" class="green" min="50" max="5000" step="50" value="300">
+        <div class="param-range"><span>50 €</span><span>5 000 €</span></div>
+      </div>
+
+      <div class="param">
+        <div class="param-header">
+          <span class="param-name">Taux annuel moyen</span>
+          <span class="param-value accent" id="val-taux">9,0 %</span>
+        </div>
+        <input type="range" id="taux" class="green" min="1" max="20" step="0.5" value="9">
+        <div class="param-range"><span>1 %</span><span>20 %</span></div>
+      </div>
+
+      <div class="param">
+        <div class="param-header">
+          <span class="param-name">Durée</span>
+          <span class="param-value accent" id="val-duree">20 ans</span>
+        </div>
+        <input type="range" id="duree" class="green" min="1" max="40" step="1" value="20">
+        <div class="param-range"><span>1 an</span><span>40 ans</span></div>
+      </div>
+
+      <div class="param">
+        <div class="param-header">
+          <span class="param-name">Capital initial (optionnel)</span>
+          <span class="param-value accent" id="val-initial">0 €</span>
+        </div>
+        <input type="range" id="initial" class="green" min="0" max="100000" step="1000" value="0">
+        <div class="param-range"><span>0 €</span><span>100 000 €</span></div>
+      </div>
+
+      <div class="section-label dca-label">DCA progressif</div>
+
+      <div class="param">
+        <div class="param-header">
+          <span class="param-name">Hausse annuelle du versement</span>
+          <span class="param-value accent3" id="val-hausse">0,0 %</span>
+        </div>
+        <input type="range" id="hausse" class="orange" min="0" max="20" step="0.5" value="0">
+        <div class="param-range"><span>0 % (fixe)</span><span>20 %/an</span></div>
+      </div>
+
+      <div class="param">
+        <div class="param-header">
+          <span class="param-name">Versement maximum (plafond)</span>
+          <span class="param-value accent3" id="val-plafond">∞</span>
+        </div>
+        <input type="range" id="plafond" class="orange" min="0" max="10000" step="100" value="0">
+        <div class="param-range"><span>Aucun</span><span>10 000 €</span></div>
+      </div>
+
+      <div class="section-label" style="border-left-color: var(--text-dim)">Autre</div>
+
+      <div class="param">
+        <div class="param-header">
+          <span class="param-name">Inflation estimée</span>
+          <span class="param-value" id="val-inflation">2,0 %</span>
+        </div>
+        <input type="range" id="inflation" class="purple" min="0" max="10" step="0.5" value="2">
+        <div class="param-range"><span>0 %</span><span>10 %</span></div>
+      </div>
+
+      <div class="dca-badge hidden" id="dca-badge">
+        ⟳ DCA progressif activé
+      </div>
+    </div>
+
+    <!-- ── PANNEAU RÉSULTATS ── -->
+    <div style="display:flex; flex-direction:column; gap:24px;">
+
+      <div class="card" style="animation-delay:0.1s">
+        <div class="card-title">Résultats</div>
+
+        <div class="results-grid">
+          <div class="result-card main">
+            <div class="result-label">Capital final</div>
+            <div class="result-amount" id="res-total">— €</div>
+            <div class="result-sub" id="res-reel">Valeur réelle (hors inflation) : — €</div>
+          </div>
+          <div class="result-card versé">
+            <div class="result-label">Capital versé</div>
+            <div class="result-amount" id="res-versé">— €</div>
+          </div>
+          <div class="result-card gains">
+            <div class="result-label">Gains des intérêts</div>
+            <div class="result-amount" id="res-gains">— €</div>
+            <div class="result-sub" id="res-perf"></div>
+          </div>
+        </div>
+
+        <div class="repartition-wrap">
+          <div class="repartition-label">
+            <span>Répartition</span>
+            <span id="rep-pct">— % générés par les intérêts</span>
+          </div>
+          <div class="repartition-bar">
+            <div class="rep-versé" id="bar-versé" style="width:60%"></div>
+            <div class="rep-gains" id="bar-gains" style="width:40%"></div>
+          </div>
+        </div>
+
+        <div class="milestones" id="milestones"></div>
+      </div>
+
+      <!-- ── GRAPHIQUE + TABLE ── -->
+      <div class="card" style="animation-delay:0.2s">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('chart', this)">Graphique</button>
+          <button class="tab" onclick="switchTab('table', this)">Tableau annuel</button>
+          <button class="tab" onclick="switchTab('dca', this)">DCA mensuel</button>
+        </div>
+
+        <div id="panel-chart">
+          <div class="chart-wrap"><canvas id="myChart"></canvas></div>
+        </div>
+
+        <div id="panel-table" style="display:none">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Année</th>
+                  <th>Versement/mois</th>
+                  <th>Versé cumulé</th>
+                  <th>Capital total</th>
+                  <th>Intérêts</th>
+                  <th>% Intérêts</th>
+                  <th>Valeur réelle</th>
+                </tr>
+              </thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="panel-dca" style="display:none">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mois</th>
+                  <th>Année</th>
+                  <th>Versement</th>
+                  <th>Versé cumulé</th>
+                  <th>Capital total</th>
+                  <th>Intérêts</th>
+                  <th>% Intérêts</th>
+                </tr>
+              </thead>
+              <tbody id="dca-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── ÉTAT ────────────────────────────────────────────────────────────────────
+let chart = null;
+let currentTab = 'chart';
+
+// ── UTILITAIRES ─────────────────────────────────────────────────────────────
+const fmt = v => Math.round(v).toLocaleString('fr-FR') + ' €';
+const fmtShort = v => {
+  if (v >= 1e6) return (v/1e6).toFixed(2).replace('.',',') + ' M€';
+  if (v >= 1e3) return (v/1e3).toFixed(0) + ' k€';
+  return Math.round(v) + ' €';
+};
+const fmtPct = v => (v*100).toFixed(1).replace('.',',') + ' %';
+const fmtVrs = v => Math.round(v).toLocaleString('fr-FR') + ' €';
+
+function getMonthlyPayment(baseVersement, hausse, plafond, yearIndex) {
+  let v = baseVersement * Math.pow(1 + hausse/100, yearIndex);
+  if (plafond > 0) v = Math.min(v, plafond);
+  return v;
+}
+
+// ── CALCUL ──────────────────────────────────────────────────────────────────
+function compute() {
+  const versement = +document.getElementById('versement').value;
+  const taux      = +document.getElementById('taux').value;
+  const duree     = +document.getElementById('duree').value;
+  const initial   = +document.getElementById('initial').value;
+  const hausse    = +document.getElementById('hausse').value;
+  const plafond   = +document.getElementById('plafond').value;
+  const inflation = +document.getElementById('inflation').value;
+
+  const r = taux / 1200; // taux mensuel
+
+  // Calcul mois par mois (DCA progressif)
+  let capital = initial;
+  let totalVerse = initial;
+  const monthlyData = [];
+
+  for (let m = 1; m <= duree * 12; m++) {
+    const yr = Math.floor((m-1) / 12);
+    const v = getMonthlyPayment(versement, hausse, plafond, yr);
+    capital = capital * (1 + r) + v;
+    totalVerse += v;
+    monthlyData.push({ m, yr: yr+1, versement: v, totalVerse, capital });
+  }
+
+  // Données annuelles
+  const annualData = [];
+  for (let y = 1; y <= duree; y++) {
+    const md = monthlyData[y*12 - 1];
+    const vMois = getMonthlyPayment(versement, hausse, plafond, y-1);
+    const reel = md.capital / Math.pow(1 + inflation/100, y);
+    annualData.push({
+      y, versementMois: vMois,
+      totalVerse: md.totalVerse,
+      capital: md.capital,
+      interets: md.capital - md.totalVerse,
+      pctInterets: (md.capital - md.totalVerse) / md.capital,
+      reel
+    });
+  }
+
+  const finalData = annualData[annualData.length - 1];
+  const capitalFinal = finalData.capital;
+  const verseCumul = finalData.totalVerse;
+  const gains = capitalFinal - verseCumul;
+  const pctGains = gains / capitalFinal;
+  const reel = finalData.reel;
+
+  return { capitalFinal, verseCumul, gains, pctGains, reel, annualData, monthlyData, duree, taux, versement, hausse, plafond, initial, inflation, r };
+}
+
+// ── MISE À JOUR UI ─────────────────────────────────────────────────────────
+function update() {
+  const d = compute();
+
+  // Résultats
+  document.getElementById('res-total').textContent = fmt(d.capitalFinal);
+  document.getElementById('res-versé').textContent = fmt(d.verseCumul);
+  document.getElementById('res-gains').textContent = '+' + fmt(d.gains);
+  document.getElementById('res-reel').textContent = 'Valeur réelle (hors inflation) : ' + fmt(d.reel);
+  document.getElementById('res-perf').textContent = '+' + fmtPct(d.gains / d.verseCumul) + ' sur capital versé';
+  document.getElementById('rep-pct').textContent = fmtPct(d.pctGains) + ' générés par les intérêts';
+
+  // Barre de répartition
+  const pVerse = (d.verseCumul / d.capitalFinal * 100).toFixed(1);
+  const pGains = (d.gains / d.capitalFinal * 100).toFixed(1);
+  document.getElementById('bar-versé').style.width = pVerse + '%';
+  document.getElementById('bar-gains').style.width = pGains + '%';
+
+  // Milestones
+  const milestones = [];
+  const targets = [100000, 250000, 500000, 1000000, 2000000];
+  for (const t of targets) {
+    if (d.capitalFinal >= t) {
+      // Trouver l'année où on atteint t
+      const yr = d.annualData.find(a => a.capital >= t);
+      if (yr) milestones.push(`${(t/1000).toFixed(0)}k€ → an ${yr.y}`);
+    }
+  }
+  document.getElementById('milestones').innerHTML = milestones.map(m => `<div class="milestone">${m}</div>`).join('');
+
+  // Badge DCA
+  const badge = document.getElementById('dca-badge');
+  badge.classList.toggle('hidden', d.hausse === 0);
+
+  // Graphique
+  updateChart(d);
+
+  // Table annuelle
+  updateTable(d);
+
+  // DCA mensuel
+  updateDCA(d);
+}
+
+function updateChart(d) {
+  const labels = d.annualData.map(a => 'An ' + a.y);
+  const invested = d.annualData.map(a => Math.round(a.totalVerse));
+  const gains = d.annualData.map(a => Math.round(a.interets));
+
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = invested;
+    chart.data.datasets[1].data = gains;
+    chart.update('active');
+    return;
+  }
+
+  chart = new Chart(document.getElementById('myChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Capital versé', data: invested, backgroundColor: 'rgba(123,108,255,0.7)', stack: 'stack', borderRadius: 3 },
+        { label: 'Intérêts composés', data: gains, backgroundColor: 'rgba(79,255,176,0.7)', stack: 'stack', borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e2330',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#7a8399',
+          bodyColor: '#f0f2f7',
+          callbacks: {
+            footer: items => 'Total : ' + items.reduce((s,i)=>s+i.raw,0).toLocaleString('fr-FR') + ' €',
+            label: item => ' ' + item.dataset.label + ' : ' + item.raw.toLocaleString('fr-FR') + ' €'
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { color: '#4a5168', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 10 },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        },
+        y: {
+          stacked: true,
+          ticks: { color: '#4a5168', font: { family: 'DM Mono', size: 10 }, callback: v => fmtShort(v) },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        }
+      }
+    }
+  });
+}
+
+function updateTable(d) {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = d.annualData.map(a => {
+    const milestone = [100000,250000,500000,1000000,2000000].some(t => {
+      const prev = d.annualData[a.y-2];
+      return a.capital >= t && (!prev || prev.capital < t);
+    });
+    return `<tr class="${milestone ? 'row-milestone' : ''}">
+      <td>${a.y}</td>
+      <td class="versé-col">${fmtVrs(a.versementMois)}</td>
+      <td class="versé-col">${fmt(a.totalVerse)}</td>
+      <td class="highlight">${fmt(a.capital)}</td>
+      <td class="gains-col">${fmt(a.interets)}</td>
+      <td>${fmtPct(a.pctInterets)}</td>
+      <td style="color:var(--text-dim)">${fmt(a.reel)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateDCA(d) {
+  const tbody = document.getElementById('dca-body');
+  // Afficher max 120 lignes pour perf (10 ans max sinon)
+  const maxMonths = Math.min(d.monthlyData.length, 120);
+  tbody.innerHTML = d.monthlyData.slice(0, maxMonths).map(m => {
+    const interets = m.capital - m.totalVerse;
+    const pct = m.capital > 0 ? interets / m.capital : 0;
+    return `<tr>
+      <td>${m.m}</td>
+      <td>${m.yr}</td>
+      <td class="versé-col">${fmtVrs(m.versement)}</td>
+      <td class="versé-col">${fmt(m.totalVerse)}</td>
+      <td class="highlight">${fmt(m.capital)}</td>
+      <td class="gains-col">${fmt(interets)}</td>
+      <td>${fmtPct(pct)}</td>
+    </tr>`;
+  }).join('');
+  if (d.monthlyData.length > 120) {
+    tbody.innerHTML += `<tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:12px;font-size:11px;">Affichage limité aux 120 premiers mois — tableau annuel disponible ci-dessus</td></tr>`;
+  }
+}
+
+// ── SLIDERS ─────────────────────────────────────────────────────────────────
+function initSlider(id, displayId, format) {
+  const slider = document.getElementById(id);
+  const display = document.getElementById(displayId);
+  function refresh() {
+    const v = +slider.value;
+    display.textContent = format(v);
+    const min = +slider.min, max = +slider.max;
+    const pct = ((v - min) / (max - min) * 100).toFixed(1);
+    slider.style.setProperty('--pct', pct + '%');
+    update();
+  }
+  slider.addEventListener('input', refresh);
+  refresh();
+}
+
+initSlider('versement', 'val-versement', v => v.toLocaleString('fr-FR') + ' €');
+initSlider('taux',      'val-taux',      v => v.toFixed(1).replace('.',',') + ' %');
+initSlider('duree',     'val-duree',     v => v + ' an' + (v > 1 ? 's' : ''));
+initSlider('initial',   'val-initial',   v => v === 0 ? '0 €' : v.toLocaleString('fr-FR') + ' €');
+initSlider('hausse',    'val-hausse',    v => v.toFixed(1).replace('.',',') + ' %');
+initSlider('plafond',   'val-plafond',   v => v === 0 ? '∞' : v.toLocaleString('fr-FR') + ' €');
+initSlider('inflation', 'val-inflation', v => v.toFixed(1).replace('.',',') + ' %');
+
+// ── TABS ────────────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  currentTab = tab;
+  ['chart','table','dca'].forEach(t => {
+    document.getElementById('panel-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (tab === 'chart' && chart) chart.resize();
+}
+</script>
+</body>
+</html>
